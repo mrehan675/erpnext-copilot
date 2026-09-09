@@ -337,6 +337,8 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
         this._load_last_session();
         this._load_accent_color();
         this._load_companies();
+                // FAC
+        this._check_fac_connection();
         this._load_elevenlabs_config();
     }
 
@@ -418,7 +420,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
 
     render() {
         this.$btn = $(`
-            <div class="ai-chat-btn" title="AI Assistant">
+            <div class="ai-chat-btn" title="ALM Assistant">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
                      stroke="currentColor" stroke-width="2">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -430,8 +432,12 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
             <div class="ai-chat-panel" style="display:none">
                 <div class="ai-chat-header">
                     <div class="ai-chat-header-left">
-                        <span class="ai-chat-title">AI Assistant</span>
+                        <span class="ai-chat-title">ALM Assistant</span>
                         <span class="ai-company-badge" title="Click to switch company">...</span>
+                        <!-- FAC CONNECTION BUTTON -->
+                        <button class="ai-fac-connect btn btn-xs" title="Connect to FAC" >
+                            🔗 Connect
+                        </button>
                     </div>
                     <div class="ai-chat-header-actions">
                         <button class="ai-chat-toggle-sidebar btn btn-xs" title="Toggle sidebar" style="display:none">
@@ -441,6 +447,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
                                 <line x1="9" y1="3" x2="9" y2="21"/>
                             </svg>
                         </button>
+                        
                         <button class="ai-chat-new-session btn btn-xs" title="New conversation">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                                  stroke="currentColor" stroke-width="2">
@@ -448,6 +455,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
                                 <line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
                         </button>
+                        
                         <button class="ai-chat-help btn btn-xs" title="Help — see all commands">?</button>
                         <button class="ai-chat-export btn btn-xs" title="Export conversation">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -502,7 +510,9 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
                         </div>
                         <div class="ai-sidebar-mode-tabs">
                             <button class="ai-mode-tab active" data-mode="ai">AI Chats</button>
+                            <!--
                             <button class="ai-mode-tab" data-mode="dm">DMs <span class="ai-dm-badge" style="display:none">0</span></button>
+                            -->
                         </div>
                         <div class="ai-sidebar-ai-section">
                             <div class="ai-sidebar-category-tabs">
@@ -584,6 +594,8 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
                             <textarea class="ai-chat-input"
                                 placeholder="Ask about your ERPNext data..."
                                 rows="1"></textarea>
+
+                            <!--
                             <button class="ai-chat-voice btn btn-xs" title="Voice input">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                      stroke="currentColor" stroke-width="2">
@@ -593,6 +605,8 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
                                     <line x1="8" y1="23" x2="16" y2="23"/>
                                 </svg>
                             </button>
+                            -->
+
                             <button class="ai-chat-send btn btn-primary btn-sm">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                      stroke="currentColor" stroke-width="2">
@@ -672,6 +686,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
     // ── Events ──────────────────────────────────────────────────────
 
     bind_events() {
+        this.$panel.find(".ai-fac-connect").on("click", () => { this._connect_fac();});
         this.$btn.on("click", () => this.toggle());
         this.$panel.find(".ai-chat-close").on("click", () => this.toggle());
         this.$panel.find(".ai-chat-new-session").on("click", () => this.new_session());
@@ -981,6 +996,153 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
         this._load_ai_name();
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // FAC OAuth Connection
+    // ─────────────────────────────────────────────────────────────
+
+    async _check_fac_connection() {
+
+        const $btn = this.$panel.find(".ai-fac-connect");
+
+        try {
+
+            const r = await frappe.call({
+                method:
+                    "erpnext_ai_bots.api.fac_oauth.get_fac_connection_status",
+                async: true
+            });
+
+            const connected = r.message?.connected;
+
+            if (connected) {
+
+                $btn
+                    .addClass("fac-connected")
+                    .html("🟢 FAC")
+                    .attr("title", "FAC Connected");
+
+            } else {
+
+                $btn
+                    .removeClass("fac-connected")
+                    .html("🔗 Connect")
+                    .attr("title", "Connect to FAC");
+            }
+
+        } catch (error) {
+
+            console.error(
+                "FAC connection status error:",
+                error
+            );
+
+            $btn
+                .removeClass("fac-connected")
+                .html("🔗 Connect");
+        }
+    }
+
+
+    async _connect_fac() {
+
+        const $btn = this.$panel.find(".ai-fac-connect");
+
+        // If already connected, show options
+        if ($btn.hasClass("fac-connected")) {
+
+            frappe.confirm(
+                __("FAC is connected. Do you want to disconnect?"),
+
+                async () => {
+
+                    try {
+
+                        $btn
+                            .prop("disabled", true)
+                            .text(__("Disconnecting..."));
+
+                        await frappe.call({
+                            method:
+                                "erpnext_ai_bots.api.fac_oauth.disconnect_fac"
+                        });
+
+                        $btn
+                            .prop("disabled", false)
+                            .removeClass("fac-connected")
+                            .html("🔗 Connect")
+                            .attr("title", "Connect to FAC");
+
+                        frappe.show_alert({
+                            message: __("FAC disconnected"),
+                            indicator: "orange"
+                        });
+
+                    } catch (error) {
+
+                        console.error(
+                            "FAC disconnect error:",
+                            error
+                        );
+
+                        $btn.prop(
+                            "disabled",
+                            false
+                        );
+
+                        this._check_fac_connection();
+                    }
+                }
+            );
+
+            return;
+        }
+
+
+        // Start OAuth connection
+        try {
+
+            $btn
+                .prop("disabled", true)
+                .text(__("Connecting..."));
+
+            const r = await frappe.call({
+                method:
+                    "erpnext_ai_bots.api.fac_oauth.start_fac_oauth"
+            });
+
+            if (r.message?.authorization_url) {
+
+                // Redirect user to Frappe/FAC OAuth authorization
+                window.location.href =
+                    r.message.authorization_url;
+
+                return;
+            }
+
+            throw new Error(
+                "FAC authorization URL was not returned"
+            );
+
+        } catch (error) {
+
+            console.error(
+                "FAC OAuth connection error:",
+                error
+            );
+
+            $btn
+                .prop("disabled", false)
+                .html("🔗 Connect");
+
+            frappe.msgprint({
+                title: __("FAC Connection Failed"),
+                message:
+                    __("Unable to start FAC authorization."),
+                indicator: "red"
+            });
+        }
+    }
+
     // ── Panel open/close ─────────────────────────────────────────────
 
     toggle() {
@@ -1180,7 +1342,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
 
         // Reply quote bubble
         if (opts.reply_to_text) {
-            const reply_label = opts.reply_to_role === "user" ? "You" : "AI Assistant";
+            const reply_label = opts.reply_to_role === "user" ? "You" : "ALM Assistant";
             const $quote = $(`<div class="ai-reply-quote">
                 <span class="ai-reply-quote-label">${frappe.utils.escape_html(reply_label)}</span>
                 <span class="ai-reply-quote-text">${frappe.utils.escape_html(opts.reply_to_text.substring(0, 120))}</span>
@@ -1614,7 +1776,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
             <div class="ai-connect-flow">
                 <div class="ai-connect-prompt">
                     <p><strong>Connect your ChatGPT account</strong></p>
-                    <p class="text-muted">To use the AI Assistant, you need to connect your ChatGPT Plus, Pro, or Max account.</p>
+                    <p class="text-muted">To use the ALM Assistant, you need to connect your ChatGPT Plus, Pro, or Max account.</p>
                     <button class="btn btn-sm btn-primary ai-connect-start-btn">Connect ChatGPT Account</button>
                 </div>
                 <div class="ai-connect-paste" style="display:none;">
@@ -2187,7 +2349,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
 
     _start_reply(index, role, text) {
         this._reply_to = { index, role, text };
-        const label = role === "user" ? "You" : "AI Assistant";
+        const label = role === "user" ? "You" : "ALM Assistant";
         this.$reply_bar.find(".ai-reply-bar-label").text("Replying to " + label);
         this.$reply_bar.find(".ai-reply-bar-text").text(text.substring(0, 80) + (text.length > 80 ? "..." : ""));
         this.$reply_bar.show();
@@ -2461,7 +2623,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
         this._dm_user = null;
         this.$dm_section.hide();
         this.$ai_section.show();
-        this.$panel.find(".ai-chat-title").text("AI Assistant");
+        this.$panel.find(".ai-chat-title").text("ALM Assistant");
         // If we were viewing a DM conversation, reload the AI session
         if (this.session_id) {
             this._load_session(this.session_id);
@@ -2602,7 +2764,7 @@ erpnext_ai_bots.ChatWidget = class ChatWidget {
         }
 
         // Forward detection and rich rendering
-        const fwd_match = text.match(/^(?:([\s\S]*?)\n\n)?--- Forwarded from (You|AI Assistant) ---\n\n?([\s\S]*)$/);
+        const fwd_match = text.match(/^(?:([\s\S]*?)\n\n)?--- Forwarded from (You|ALM Assistant) ---\n\n?([\s\S]*)$/);
         if (fwd_match) {
             $msg.addClass("ai-msg-forwarded");
             const fwd_note = (fwd_match[1] || "").trim();
