@@ -119,7 +119,9 @@ class ToolRegistry:
         for namespaced_name in TOOL_MAP:
             try:
                 tool = self.get_tool(namespaced_name)
-                schemas.append(tool.schema())
+                schema = tool.schema()
+                schema["name"] = schema["name"].replace(".", "_")
+                schemas.append(schema)
             except Exception as e:
                 import frappe
                 frappe.log_error(
@@ -127,6 +129,17 @@ class ToolRegistry:
                     message=str(e),
                 )
         return schemas
+
+    def get_namespaced_name_by_anthropic_name(self, anthropic_name: str) -> str:
+        """Resolve an Anthropic-safe tool name to its internal namespaced name."""
+        if anthropic_name in TOOL_MAP:
+            return anthropic_name
+
+        namespaced_name = anthropic_name.replace("_", ".", 1)
+        if namespaced_name in TOOL_MAP:
+            return namespaced_name
+
+        raise ValueError(f"Unknown Anthropic tool: {anthropic_name}")
 
     def get_openai_schemas(self) -> list:
         """Return tool schemas for ALL registered tools in OpenAI Responses API format.

@@ -1317,6 +1317,10 @@ class Orchestrator:
             self.stream_bridge.send_tool_start(tool_name, tool_input)
 
             try:
+                tool_name = self.tool_registry.get_namespaced_name_by_anthropic_name(
+                    tool_name
+                )
+
                 # Permission check
                 self.permission_guard.check(tool_name, tool_input)
 

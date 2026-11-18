@@ -22,7 +22,7 @@ from frappe.utils import now_datetime, add_to_date, get_datetime
 #     ).rstrip("/")
 
 #FAC_BASE_URL = frappe.utils.get_url()
-FAC_BASE_URL = "https://bq-demo.vsspk.com"
+FAC_BASE_URL = "https://erp-demo.nisargroup.com"  # Replace with your actual FAC base URL
 
 
 FAC_REGISTER_URL = (
